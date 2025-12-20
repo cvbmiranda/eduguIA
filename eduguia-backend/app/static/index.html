@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduGuIA — Sistema de Perfil Educacional</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+    <div id="login-screen" class="login-wrapper">
+        <div class="login-box">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h1 class="brand" style="font-size: 2.5rem;">EduGuIA</h1>
+                <p class="mut">Sistema de Perfil Educacional</p>
+            </div>
+            
+            <form id="loginForm">
+                <input id="matricula" class="input" placeholder="E-mail ou Matrícula" required />
+                <input id="password" type="password" class="input" placeholder="Senha" required />
+                
+                <div id="loginMsg" style="text-align: center; margin-bottom: 12px; font-weight: bold; min-height: 20px;"></div>
+                
+                <button type="submit" id="loginBtn" class="btn btn-primary" style="width: 100%;">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-screen" class="container hidden">
+        
+        <header class="card hdr">
+            <div>
+                <h1 class="brand" style="font-size: 2rem;">EduGuIA</h1>
+                <div class="mut">Ambiente do Estudante</div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span id="roleTag" class="badge" style="background: rgba(125,211,252,.1); padding: 5px 10px; border-radius: 20px; border: 1px solid var(--b1);">Carregando...</span>
+                <button id="btnLogout" class="btn btn-err btn-sm">Sair</button>
+            </div>
+
+            <nav class="tabs" style="width: 100%; margin-top: 15px;">
+                <button class="tab active" data-tab="home">🏠 Início</button>
+                <button class="tab" data-tab="chat">💬 Chat IA</button>
+                <button class="tab" data-tab="parkour">🎮 Parkour</button>
+                <button class="tab" data-tab="estilos">🕹️ Estilos</button>
+                <button class="tab" data-tab="interesses">⭐ Interesses</button>
+                <button class="tab" data-tab="progresso">📊 Progresso</button>
+                <button class="tab hidden" data-tab="gestao">🗂️ Gestão</button>
+                <button class="tab hidden" data-tab="relatorios">📈 Relatórios</button>
+            </nav>
+        </header>
+
+        <section id="tab-home" role="tabpanel">
+            <div style="text-align: center; margin: 20px 0;">
+                <h2>👋 Bem-vindo!</h2>
+                <p class="mut">Selecione uma atividade para começar.</p>
+            </div>
+            <div class="grid-auto">
+                <article class="card" onclick="navigateTo('chat')" style="cursor: pointer; text-align: center;">
+                    <div style="font-size: 40px;">💬</div>
+                    <h3>Entrevista Inicial</h3>
+                    <p class="mut">Converse com a IA</p>
+                    <div class="progress"><span></span></div>
+                </article>
+                <article class="card" onclick="navigateTo('parkour')" style="cursor: pointer; text-align: center;">
+                    <div style="font-size: 40px;">🎮</div>
+                    <h3>Parkour</h3>
+                    <p class="mut">Teste de Resiliência</p>
+                    <div class="progress"><span></span></div>
+                </article>
+                </div>
+        </section>
+
+        <section id="tab-chat" role="tabpanel" class="hidden">
+            <div class="card"><h2>💬 Chat IA</h2><p class="mut">Área do Chat (A ser implementada)</p></div>
+        </section>
+        <section id="tab-parkour" role="tabpanel" class="hidden">
+            <div class="card"><h2>🎮 Parkour</h2><p class="mut">Área do Jogo (A ser implementada)</p></div>
+        </section>
+        <section id="tab-estilos" role="tabpanel" class="hidden">
+            <div class="card"><h2>🕹️ Estilos</h2><p class="mut">Área de Estilos (A ser implementada)</p></div>
+        </section>
+        <section id="tab-interesses" role="tabpanel" class="hidden">
+            <div class="card"><h2>⭐ Interesses</h2><p class="mut">Área de Interesses (A ser implementada)</p></div>
+        </section>
+        <section id="tab-progresso" role="tabpanel" class="hidden">
+            <div class="card"><h2>📊 Progresso</h2><p class="mut">Resultados (A ser implementada)</p></div>
+        </section>
+        <section id="tab-gestao" role="tabpanel" class="hidden">
+            <div class="card"><h2>🗂️ Gestão</h2><p class="mut">Painel Admin (A ser implementada)</p></div>
+        </section>
+        <section id="tab-relatorios" role="tabpanel" class="hidden">
+            <div class="card"><h2>📈 Relatórios</h2><p class="mut">Dashboards (A ser implementada)</p></div>
+        </section>
+
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
