@@ -41,7 +41,7 @@ export default function EduGuIA() {
     }
   };
 
-  // ==========================================
+// ==========================================
   // ⭐ TORNEIO DE INTERESSES 
   // ==========================================
   const DUELOS = [
@@ -49,14 +49,30 @@ export default function EduGuIA() {
     { a: { p: "Inteligência Artificial", i: "🤖 Robô" }, b: { p: "Música", i: "🎛️ Mesa de som" } },
     { a: { p: "Esportes", i: "⚽ Bola" }, b: { p: "Cultura geek", i: "📖 HQ ou mangá" } }
   ];
-  const [intRound, setIntRound] = useState(0); const [intScores, setIntScores] = useState<Record<string, number>>({}); const [intPulos, setIntPulos] = useState(0); const [intCampeao, setIntCampeao] = useState("");
+  const [intRound, setIntRound] = useState(0); 
+  const [intScores, setIntScores] = useState<Record<string, number>>({}); 
+  const [intPulos, setIntPulos] = useState(0); 
+  const [intCampeao, setIntCampeao] = useState("");
+
   const handleEscolhaInteresse = (profile: string) => { const newScores = { ...intScores, [profile]: (intScores[profile] || 0) + 1 }; setIntScores(newScores); avancarRodada(newScores); };
   const pularParInteresse = () => { if (intPulos < 5) { setIntPulos(p => p + 1); avancarRodada(intScores); } else { alert("Máximo de 5 pulos atingido!"); } };
   const avancarRodada = (currentScores: Record<string, number>) => { if (intRound < DUELOS.length - 1) { setIntRound(p => p + 1); } else { let maxScore = -1; let winner = ""; for (const [prof, score] of Object.entries(currentScores)) { if (score > maxScore) { maxScore = score; winner = prof; } } setIntCampeao(winner || "Generalista"); } };
   const reiniciarTorneio = () => { setIntRound(0); setIntScores({}); setIntPulos(0); setIntCampeao(""); };
+  
+  // 👇 ESPIÃO DE AUTO-SALVAMENTO ADICIONADO AQUI!
+  useEffect(() => {
+    if (intCampeao !== "") {
+      salvarPerfilNoBanco({ peda_aptidoes: intCampeao });
+      setTimeout(() => {
+        alert(`⭐ Preferência (${intCampeao}) salva automaticamente!`);
+        setAbaAtiva("progresso");
+      }, 1500);
+    }
+  }, [intCampeao]);
+
   const concluirTorneio = () => { 
-    salvarPerfilNoBanco({ peda_aptidoes: intCampeao }); 
-    alert(`⭐ Perfil (${intCampeao}) salvo no seu Relatório!`); 
+    // Como o 'espião' acima já salva no banco automaticamente,
+    // esta função agora apenas redireciona a tela.
     setAbaAtiva("progresso"); 
   };
 
@@ -86,23 +102,309 @@ export default function EduGuIA() {
     setAbaAtiva("progresso"); 
   };
 
-  // ==========================================
-  // 🎮 PARKOUR
+// ==========================================
+  // 🎮 PARKOUR (MOTOR AVANÇADO V2)
   // ==========================================
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>();
-  const [pkStatus, setPkStatus] = useState<'idle' | 'playing' | 'gameover'>('idle');
+  
+  // Refs para atualizar o HUD sem travar o React (Alta Performance)
+  const pkRefs = {
+    fase: useRef<HTMLDivElement>(null), moedas: useRef<HTMLDivElement>(null),
+    tentativas: useRef<HTMLDivElement>(null), tempo: useRef<HTMLDivElement>(null),
+    mortes: useRef<HTMLDivElement>(null), pulos: useRef<HTMLDivElement>(null),
+    resDisplay: useRef<HTMLDivElement>(null), resValue: useRef<HTMLDivElement>(null)
+  };
+
+  // Estado para controlar os Modais do Jogo
+  const [pkModal, setPkModal] = useState<{show: boolean, type: string, data?: any}>({ show: false, type: '' });
+  const pkEngine = useRef<any>({}); // Guarda o motor do jogo para os botões do React acessarem
+
+  // Mantém a compatibilidade com a tela de progresso (0.0 a 5.0)
   const [hudDisplay, setHudDisplay] = useState({ blocos: 0, velocidade: 4, scoreResiliencia: "0.0" });
-  const gameState = useRef<any>({ running: false, speed: 4, score: 0, pl: { x: 100, y: 220, w: 30, h: 30, vy: 0, onGround: true, color: "" }, plats: [], stars: [] });
-  const initStars = (W: number, H: number) => Array.from({ length: 40 }, () => ({ x: Math.random() * W, y: Math.random() * H, size: Math.random() * 2, speed: Math.random() * 0.5 + 0.1 }));
-  const gerarProximaPlataforma = (W: number, speed: number, lastX: number) => ({ x: lastX + Math.random() * (100 + speed * 15 - (60 + speed * 10)) + (60 + speed * 10), y: [220, 250, 280][Math.floor(Math.random() * 3)], w: Math.random() * 90 + 60, h: 20, passed: false });
-  const iniciarParkour = () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); const ctx = canvasRef.current?.getContext('2d'); if (!ctx) return; const playerGrad = ctx.createLinearGradient(0, 0, 0, 30); playerGrad.addColorStop(0, "#7dd3fc"); playerGrad.addColorStop(1, "#0ea5e9"); gameState.current = { running: true, speed: 4.0, score: 0, pl: { x: 100, y: 200, w: 30, h: 30, vy: 0, onGround: false, color: playerGrad }, plats: [{ x: 50, y: 250, w: 400, h: 20, passed: true }], stars: initStars(canvasRef.current!.width, canvasRef.current!.height) }; setPkStatus('playing'); updateHud(); requestRef.current = requestAnimationFrame(loopEngine); };
-  const pararParkour = () => { if (gameState.current) gameState.current.running = false; if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-  const pularParkour = () => { const s = gameState.current; if (s.running && s.pl.onGround) { s.pl.vy = -12.5; s.pl.onGround = false; } };
-  const updateHud = () => { const s = gameState.current; setHudDisplay({ blocos: s.score, velocidade: parseFloat(s.speed.toFixed(1)), scoreResiliencia: Math.min(5.0, (s.score / 50) * 5.0).toFixed(1) }); };
-  const loopEngine = () => { const canvas = canvasRef.current; const s = gameState.current; if (!canvas || !s.running) return; const ctx = canvas.getContext('2d'); if (!ctx) return; const W = canvas.width; const H = canvas.height; ctx.fillStyle = "#0b1222"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#ffffff44"; s.stars.forEach((star: any) => { ctx.beginPath(); ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2); ctx.fill(); star.x -= star.speed * (s.speed / 2); if (star.x < 0) star.x = W; }); const pl = s.pl; pl.vy += 0.7; pl.y += pl.vy; pl.onGround = false; const platGrad = ctx.createLinearGradient(0, 0, W, 0); platGrad.addColorStop(0, "#3b82f6"); platGrad.addColorStop(1, "#60a5fa"); ctx.fillStyle = platGrad; s.plats = s.plats.filter((p: any) => p.x + p.w > -50); s.plats.forEach((p: any) => { p.x -= s.speed; ctx.shadowColor = "#3b82f6"; ctx.shadowBlur = 8; ctx.fillRect(p.x, p.y, p.w, p.h); ctx.shadowBlur = 0; if (pl.vy >= 0 && pl.x + pl.w > p.x + 4 && pl.x < p.x + p.w - 4 && pl.y + pl.h >= p.y && pl.y + pl.h <= p.y + pl.vy + 4) { pl.y = p.y - pl.h; pl.vy = 0; pl.onGround = true; } if (!p.passed && pl.x > p.x + p.w) { p.passed = true; s.score++; if (s.score % 3 === 0) s.speed += 0.3; updateHud(); } }); let ultimaPlat = s.plats[s.plats.length - 1]; let limiteDireito = ultimaPlat ? (ultimaPlat.x + ultimaPlat.w) : 0; while (limiteDireito < W + 300) { const newPlat = gerarProximaPlataforma(W, s.speed, limiteDireito); s.plats.push(newPlat); ultimaPlat = newPlat; limiteDireito = ultimaPlat.x + ultimaPlat.w; } ctx.fillStyle = pl.color; ctx.shadowColor = "#7dd3fc"; ctx.shadowBlur = 12; ctx.fillRect(pl.x, pl.y, pl.w, pl.h); ctx.shadowBlur = 0; if (pl.y > H) { pararParkour(); setPkStatus('gameover'); return; } requestRef.current = requestAnimationFrame(loopEngine); };
-  useEffect(() => { if (abaAtiva === "parkour") setPkStatus('idle'); else pararParkour(); }, [abaAtiva]);
-  useEffect(() => { const handleKeyDown = (e: KeyboardEvent) => { if ((e.code === 'Space' || e.code === 'ArrowUp') && abaAtiva === 'parkour') { e.preventDefault(); if (pkStatus === 'idle' || pkStatus === 'gameover') iniciarParkour(); else if (pkStatus === 'playing') pularParkour(); } }; window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [abaAtiva, pkStatus]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'parkour') {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+
+    // --- SEUS MAPAS AQUI ---
+    const MAPS = [
+      { id: 1, description: "Introdução aos controles e lógica", rawData: [{"type":"wall","x":50,"y":250,"w":20,"h":100},{"type":"wall","x":100,"y":180,"w":20,"h":100},{"type":"platform","x":100,"y":320,"w":70,"h":20},{"type":"platform","x":170,"y":320,"w":70,"h":20},{"type":"platform","x":250,"y":430,"w":70,"h":20},{"type":"platform","x":320,"y":430,"w":70,"h":20},{"type":"platform","x":60,"y":500,"w":70,"h":20},{"type":"platform","x":130,"y":500,"w":70,"h":20},{"type":"coin","x":140,"y":290,"w":20,"h":20},{"type":"death","x":0,"y":630,"w":1300,"h":20},{"type":"player","x":70,"y":380,"w":28,"h":36},{"type":"platform","x":480,"y":380,"w":70,"h":20},{"type":"platform","x":550,"y":380,"w":70,"h":20},{"type":"goal","x":900,"y":260,"w":60,"h":20},{"type":"platform","x":680,"y":320,"w":70,"h":20},{"type":"platform","x":750,"y":320,"w":70,"h":20},{"type":"enemy","x":450,"y":280,"w":28,"h":28,"dir":"horizontal","range":240, "speed": 2.25, "id": 1}] },
+      { id: 2, description: "Exige mais precisão e leitura", rawData: [{"type":"death","x":0,"y":630,"w":1300,"h":20},{"type":"platform","x":50,"y":500,"w":70,"h":20},{"type":"platform","x":120,"y":500,"w":70,"h":20},{"type":"platform","x":250,"y":440,"w":70,"h":20},{"type":"platform","x":320,"y":440,"w":70,"h":20},{"type":"platform","x":100,"y":360,"w":70,"h":20},{"type":"platform","x":40,"y":360,"w":70,"h":20},{"type":"wall","x":20,"y":300,"w":20,"h":80},{"type":"wall","x":100,"y":280,"w":20,"h":80},{"type":"coin","x":70,"y":320,"w":20,"h":20},{"type":"platform","x":460,"y":380,"w":70,"h":20},{"type":"platform","x":530,"y":380,"w":70,"h":20},{"type":"platform","x":430,"y":520,"w":70,"h":20},{"type":"platform","x":500,"y":520,"w":70,"h":20},{"type":"slide","x":570,"y":520,"w":70,"h":20},{"type":"slide","x":640,"y":520,"w":70,"h":20},{"type":"coin","x":670,"y":480,"w":20,"h":20},{"type":"player","x":60,"y":420,"w":28,"h":36},{"type":"platform","x":660,"y":320,"w":70,"h":20},{"type":"platform","x":730,"y":320,"w":70,"h":20},{"type":"goal","x":870,"y":270,"w":60,"h":20},{"type":"enemy","x":360,"y":320,"w":28,"h":28,"dir":"horizontal","range":400, "speed": 10.8, "id": 1}] },
+      { id: 3, description: "Introduz plataformas escorregadias", rawData: [{"type":"death","x":0,"y":630,"w":1300,"h":20},{"type":"platform","x":50,"y":500,"w":70,"h":20},{"type":"platform","x":120,"y":500,"w":70,"h":20},{"type":"platform","x":250,"y":440,"w":70,"h":20},{"type":"platform","x":320,"y":440,"w":70,"h":20},{"type":"platform","x":100,"y":360,"w":70,"h":20},{"type":"platform","x":40,"y":360,"w":70,"h":20},{"type":"wall","x":20,"y":300,"w":20,"h":80},{"type":"wall","x":100,"y":280,"w":20,"h":80},{"type":"coin","x":70,"y":320,"w":20,"h":20},{"type":"platform","x":460,"y":380,"w":70,"h":20},{"type":"platform","x":530,"y":380,"w":70,"h":20},{"type":"platform","x":430,"y":520,"w":70,"h":20},{"type":"platform","x":500,"y":520,"w":70,"h":20},{"type":"slide","x":570,"y":520,"w":70,"h":20},{"type":"slide","x":640,"y":520,"w":70,"h":20},{"type":"coin","x":670,"y":480,"w":20,"h":20},{"type":"player","x":60,"y":420,"w":28,"h":36},{"type":"platform","x":660,"y":320,"w":70,"h":20},{"type":"platform","x":730,"y":320,"w":70,"h":20},{"type":"goal","x":870,"y":270,"w":60,"h":20},{"type":"enemy","x":360,"y":270,"w":28,"h":28,"dir":"horizontal","range":600, "speed": 12.0, "id": 1},{"type":"wall","x":540,"y":460,"w":20,"h":80},{"type":"wall","x":540,"y":380,"w":20,"h":80},{"type":"wall","x":540,"y":300,"w":20,"h":80},{"type":"platform","x":550,"y":380,"w":70,"h":20},{"type":"platform","x":590,"y":440,"w":70,"h":20},{"type":"platform","x":1200,"y":30,"w":70,"h":20},{"type":"enemy","x":420,"y":440,"w":28,"h":28,"dir":"vertical","range":150, "speed": 2.7, "id": 3}] },
+      { id: 4, description: "Frustração controlada com múltiplos inimigos", rawData: [{"type":"player","x":80,"y":520,"w":35,"h":35},{"type":"platform","x":40,"y":540,"w":100,"h":12},{"type":"platform","x":250,"y":510,"w":100,"h":12},{"type":"platform","x":30,"y":410,"w":100,"h":12},{"type":"platform","x":130,"y":410,"w":50,"h":12},{"type":"wall","x":30,"y":320,"w":12,"h":100},{"type":"wall","x":100,"y":320,"w":12,"h":100},{"type":"coin","x":50,"y":380,"w":25,"h":25},{"type":"platform","x":450,"y":540,"w":100,"h":12},{"type":"platform","x":490,"y":540,"w":100,"h":12},{"type":"wall","x":540,"y":450,"w":12,"h":100},{"type":"slide","x":540,"y":540,"w":120,"h":12},{"type":"slide","x":570,"y":540,"w":120,"h":12},{"type":"death","x":0,"y":630,"w":1300,"h":30},{"type":"platform","x":500,"y":460,"w":120,"h":12},{"type":"wall","x":540,"y":400,"w":12,"h":100},{"type":"coin","x":500,"y":500,"w":25,"h":25},{"type":"coin","x":570,"y":500,"w":25,"h":25},{"type":"platform","x":710,"y":410,"w":100,"h":12},{"type":"platform","x":940,"y":390,"w":120,"h":12},{"type":"slide","x":780,"y":280,"w":100,"h":12},{"type":"slide","x":730,"y":280,"w":100,"h":12},{"type":"slide","x":680,"y":280,"w":100,"h":12},{"type":"slide","x":630,"y":280,"w":100,"h":12},{"type":"slide","x":580,"y":280,"w":100,"h":12},{"type":"slide","x":650,"y":200,"w":100,"h":12},{"type":"slide","x":710,"y":200,"w":100,"h":12},{"type":"coin","x":700,"y":170,"w":25,"h":25},{"type":"platform","x":420,"y":260,"w":100,"h":12},{"type":"slide","x":190,"y":210,"w":100,"h":12},{"type":"goal","x":40,"y":140,"w":40,"h":40},{"type":"enemy","x":370,"y":420,"w":25,"h":25,"dir":"vertical","range":160, "speed": 3.0, "id": 1},{"type":"enemy","x":200,"y":370,"w":25,"h":25,"dir":"vertical","range":160, "speed": 2.8, "id": 2},{"type":"enemy","x":720,"y":250,"w":25,"h":25,"dir":"horizontal","range":160, "speed": 3.2, "id": 3}] },
+      { id: 5, description: "Estrutura APARENTEMENTE possível...", rawData: [{"type":"player","x":80,"y":520,"w":35,"h":35},{"type":"platform","x":40,"y":540,"w":100,"h":12},{"type":"platform","x":250,"y":510,"w":100,"h":12},{"type":"platform","x":30,"y":410,"w":100,"h":12},{"type":"platform","x":130,"y":410,"w":50,"h":12},{"type":"wall","x":30,"y":320,"w":12,"h":100},{"type":"wall","x":100,"y":320,"w":12,"h":100},{"type":"coin","x":50,"y":380,"w":25,"h":25},{"type":"platform","x":450,"y":540,"w":100,"h":12},{"type":"platform","x":490,"y":540,"w":100,"h":12},{"type":"wall","x":540,"y":450,"w":12,"h":100},{"type":"slide","x":540,"y":540,"w":120,"h":12},{"type":"slide","x":570,"y":540,"w":120,"h":12},{"type":"death","x":0,"y":630,"w":1300,"h":30},{"type":"platform","x":500,"y":460,"w":120,"h":12},{"type":"wall","x":540,"y":400,"w":12,"h":100},{"type":"coin","x":500,"y":500,"w":25,"h":25},{"type":"coin","x":570,"y":500,"w":25,"h":25},{"type":"platform","x":710,"y":410,"w":100,"h":12},{"type":"platform","x":940,"y":390,"w":120,"h":12},{"type":"slide","x":780,"y":280,"w":100,"h":12},{"type":"slide","x":730,"y":280,"w":100,"h":12},{"type":"slide","x":680,"y":280,"w":100,"h":12},{"type":"slide","x":630,"y":280,"w":100,"h":12},{"type":"slide","x":580,"y":280,"w":100,"h":12},{"type":"slide","x":650,"y":200,"w":100,"h":12},{"type":"slide","x":710,"y":200,"w":100,"h":12},{"type":"coin","x":700,"y":170,"w":25,"h":25},{"type":"platform","x":420,"y":260,"w":100,"h":12},{"type":"slide","x":190,"y":210,"w":100,"h":12},{"type":"goal","x":1180,"y":80,"w":80,"h":30},{"type":"enemy","x":370,"y":420,"w":25,"h":25,"dir":"vertical","range":160, "speed": 3.0, "id": 1},{"type":"enemy","x":200,"y":370,"w":25,"h":25,"dir":"vertical","range":160, "speed": 2.8, "id": 2},{"type":"enemy","x":720,"y":250,"w":25,"h":25,"dir":"horizontal","range":160, "speed": 3.2, "id": 3},{"type":"slide","x":790,"y":540,"w":300,"h":12},{"type":"wall","x":880,"y":100,"w":12,"h":90},{"type":"coin","x":60,"y":120,"w":25,"h":25},{"type":"coin","x":1070,"y":500,"w":25,"h":25},{"type":"slide","x":880,"y":180,"w":50,"h":12}] }
+    ];
+
+    // Variáveis do Jogo
+    let currentPhase = 0;
+    let player = { x: 0, y: 0, width: 30, height: 40, velocityX: 0, velocityY: 0, speed: 5, jumpForce: 10.4, isGrounded: false, color: '#4299e1', isOnSlide: false, isDead: false };
+    let coins: any[] = [], enemies: any[] = [], platforms: any[] = [], goal: any = null;
+    let coinsCollected = 0, totalCoins = 0, attempts = 0, startTime = 0, gameTime = 0, isGameRunning = true, keys: any = {};
+    
+    // Dados de Resiliência Globais
+    let globalResilienceData = { allAttempts: [] as any[], phaseTimes: {} as any, phaseAttempts: {} as any, phaseDeaths: {} as any, phaseCoins: {} as any };
+    let attemptData: any[] = [], currentAttemptStart = 0, currentAttemptSequence: any[] = [], currentAttemptMaxHeight = 0, currentAttemptJumpTime: any = null, currentAttemptStartX = 0, currentAttemptStartY = 0, isImpulsiveAttempt = false, phaseStartTime = 0;
+    let stats = { totalDeaths: 0, skippedPhases: 0, totalJumps: 0, totalMovements: 0 };
+
+    function loadPhase(phaseIndex: number) {
+        currentPhase = phaseIndex;
+        const rawData = MAPS[phaseIndex].rawData;
+        platforms = []; coins = []; enemies = []; goal = null;
+        let coinId = 1;
+        
+        rawData.forEach((item: any) => {
+            if(item.type === "player") {
+                player.x = item.x; player.y = item.y; player.width = item.w || 28; player.height = item.h || 36;
+                player.velocityX = 0; player.velocityY = 0; player.isGrounded = false; player.isOnSlide = false; player.isDead = false;
+            } else if(item.type === "coin") {
+                coins.push({ ...item, w: item.w || 20, h: item.h || 20, collected: false, id: coinId++ });
+            } else if(item.type === "enemy") {
+                enemies.push({ ...item, w: item.w || 28, h: item.h || 28, startX: item.x, startY: item.y, range: item.range || 80, speed: item.speed || 1.5, direction: 1, movement: item.dir || "horizontal", id: item.id || 1 });
+            } else if(item.type === "goal") {
+                // Adicionada flag 'completed'
+                goal = { ...item, w: item.w || 60, h: item.h || 20, active: false, completed: false };
+            } else {
+                platforms.push({ ...item, w: item.w || 70, h: item.h || 20 });
+            }
+        });
+        
+        totalCoins = coins.length; coinsCollected = 0; attempts = 0; startTime = Date.now();
+        attemptData = []; phaseStartTime = Date.now(); currentAttemptStart = Date.now();
+        currentAttemptSequence = []; currentAttemptMaxHeight = player.y; currentAttemptJumpTime = null;
+        currentAttemptStartX = player.x; currentAttemptStartY = player.y; isImpulsiveAttempt = false;
+        updateUI();
+    }
+
+    function updateUI() {
+        if(pkRefs.fase.current) pkRefs.fase.current.textContent = `${currentPhase + 1} / ${MAPS.length}`;
+        if(pkRefs.moedas.current) pkRefs.moedas.current.textContent = `${coinsCollected} / ${totalCoins}`;
+        if(pkRefs.tentativas.current) pkRefs.tentativas.current.textContent = String(attempts);
+        if(pkRefs.tempo.current) pkRefs.tempo.current.textContent = `${gameTime}s`;
+        if(pkRefs.mortes.current) pkRefs.mortes.current.textContent = String(stats.totalDeaths);
+        if(pkRefs.pulos.current) pkRefs.pulos.current.textContent = String(stats.skippedPhases);
+        
+        const resilience = calculateResilienceIndex();
+        if (attempts > 0 && pkRefs.resDisplay.current && pkRefs.resValue.current) {
+            pkRefs.resDisplay.current.style.display = 'block';
+            pkRefs.resValue.current.textContent = `${(resilience.R * 100).toFixed(1)}%`;
+        }
+    }
+
+    // --- FÓRMULAS DE RESILIÊNCIA ---
+    function recordAttemptEnd(success: boolean) {
+        const now = Date.now(); const attemptTime = now - currentAttemptStart;
+        attemptData.push({ duration: attemptTime, dx: Math.abs(player.x - currentAttemptStartX), dy: Math.abs(currentAttemptMaxHeight - player.y), jumpTime: currentAttemptJumpTime, impulsive: (attemptTime < 1500) });
+        currentAttemptStart = now; currentAttemptSequence = []; currentAttemptMaxHeight = player.y; currentAttemptJumpTime = null; currentAttemptStartX = player.x; isImpulsiveAttempt = (attemptTime < 1500);
+    }
+
+    function calculateResilienceIndex() {
+        if (attemptData.length === 0) return { R: 0, A: 0, C: 0, T: 0, D: 0 };
+        const F = attemptData.length; const phaseActiveTime = (Date.now() - phaseStartTime) / 1000;
+        let adaptiveAttempts = 0; let impulsiveAttempts = 0;
+        
+        for (let i = 1; i < F; i++) {
+            if (Math.abs(attemptData[i].dx - attemptData[i-1].dx) > 20 || Math.abs(attemptData[i].dy - attemptData[i-1].dy) > 15 || Math.abs((attemptData[i].jumpTime || 0) - (attemptData[i-1].jumpTime || 0)) > 0.2) adaptiveAttempts++;
+        }
+        attemptData.forEach(a => { if (a.impulsive) impulsiveAttempts++; });
+        
+        const A = (F > 1) ? adaptiveAttempts / (F - 1) : 0;
+        const C = 1 - (impulsiveAttempts / Math.max(1, F));
+        const T = Math.min(1, phaseActiveTime / ( [30, 45, 60, 90, 120][currentPhase] || 60 ));
+        let D = currentPhase !== 4 ? 1 - Math.tanh(phaseActiveTime / (F + 1)) : 0;
+        
+        const R = 0.35 * A + 0.25 * C + 0.25 * T - 0.15 * D;
+        return { R: Math.max(0, Math.min(1, R)), A, C, T, D };
+    }
+
+    function calculateGlobalResilienceIndex() {
+        if (globalResilienceData.allAttempts.length === 0) return { R: 0, A: 0, C: 0, T: 0, D: 0 };
+        const F = globalResilienceData.allAttempts.length;
+        const totalGameTime = Object.values(globalResilienceData.phaseTimes).reduce((a:any, b:any) => a + b, 0) as number;
+        
+        let adaptiveAttempts = 0; let impulsiveAttempts = 0;
+        for (let i = 1; i < F; i++) {
+            if (Math.abs(globalResilienceData.allAttempts[i].dx - globalResilienceData.allAttempts[i - 1].dx) > 20) adaptiveAttempts++;
+        }
+        globalResilienceData.allAttempts.forEach(a => { if (a.impulsive) impulsiveAttempts++; });
+        
+        const A = (F > 1) ? adaptiveAttempts / (F - 1) : 0;
+        const C = 1 - (impulsiveAttempts / Math.max(1, F));
+        const T = Math.max(0, Math.min(1, totalGameTime / 345) - (stats.skippedPhases * 0.1));
+        
+        let D = 0; const avgTime = totalGameTime / (F + 5);
+        if (avgTime < 10) D = 1 - (avgTime / 10);
+        D = Math.min(1, D + (stats.skippedPhases * 0.15));
+        
+        const R = 0.35 * A + 0.25 * C + 0.25 * T - 0.15 * D;
+        return { R: Math.max(0, Math.min(1, R)), A, C, T, D };
+    }
+
+    // --- FÍSICA E LOOP ---
+    function update() {
+        // Trava física se o jogo não estiver rodando, o player estiver morto ou o objetivo concluído
+        if (!isGameRunning || player.isDead || (goal && goal.completed)) return;
+        
+        if (player.y < currentAttemptMaxHeight) currentAttemptMaxHeight = player.y;
+        if (keys['jump'] && currentAttemptJumpTime === null) currentAttemptJumpTime = gameTime;
+        gameTime = Math.floor((Date.now() - startTime) / 1000);
+
+        if (keys['left']) player.velocityX = -player.speed;
+        else if (keys['right']) player.velocityX = player.speed;
+        else player.velocityX *= 0.85;
+
+        if (player.isOnSlide && player.isGrounded) player.velocityX += 0.8 * (player.velocityX > 0 ? 1 : -1);
+        if (Math.abs(player.velocityX) > 8) player.velocityX = 8 * (player.velocityX > 0 ? 1 : -1);
+        
+        if (keys['jump'] && player.isGrounded) { player.velocityY = -player.jumpForce; player.isGrounded = false; keys['jump'] = false; }
+        
+        player.x += player.velocityX; player.velocityY += 0.5; player.y += player.velocityY;
+        player.x = Math.max(10, Math.min(canvas.width! - player.width - 10, player.x));
+
+        enemies.forEach(e => {
+            if (e.movement === "horizontal") { e.x += e.speed * e.direction; if (e.x > e.startX + e.range || e.x < e.startX - e.range) e.direction *= -1; }
+            else { e.y += e.speed * e.direction; if (e.y > e.startY + e.range || e.y < e.startY - e.range) e.direction *= -1; }
+        });
+
+        checkCollisions();
+        
+        // 👇 SOLUÇÃO AQUI: Mudamos de '>' para '>=' para garantir que pisar em cima conta como vitória!
+        if (goal && goal.active && !goal.completed && 
+            player.x <= goal.x + goal.w && 
+            player.x + player.width >= goal.x && 
+            player.y <= goal.y + goal.h && 
+            player.y + player.height >= goal.y) {
+            
+            goal.completed = true; 
+            completePhase();
+        }
+        
+        if (gameTime % 2 === 0) updateUI();
+    }
+
+    function checkCollisions() {
+        player.isGrounded = false; player.isOnSlide = false;
+        
+        // Adiciona a zona de chegada como plataforma sólida para colisão
+        const solids = [...platforms];
+        if (goal) solids.push({ x: goal.x, y: goal.y, w: goal.w, h: goal.h, type: 'platform' });
+
+        solids.forEach(p => {
+            if (player.x < p.x + p.w && player.x + player.width > p.x && player.y < p.y + p.h && player.y + player.height > p.y) {
+                if (p.type === "death" && !player.isDead) return playerDie();
+                
+                if (player.velocityY > 0 && player.y + player.height > p.y && player.y < p.y && player.x + player.width > p.x + 5 && player.x < p.x + p.w - 5) {
+                    player.y = p.y - player.height; player.velocityY = 0; player.isGrounded = true;
+                    if (p.type === "slide") player.isOnSlide = true;
+                } else if (player.velocityY < 0 && player.y < p.y + p.h && player.y + player.height > p.y + p.h) {
+                    player.y = p.y + p.h; player.velocityY = 0;
+                }
+                
+                if (p.type === "wall") {
+                    if (player.velocityX > 0 && player.x + player.width > p.x && player.x < p.x && player.y + player.height > p.y + 5 && player.y < p.y + p.h - 5) { 
+                        player.x = p.x - player.width; player.velocityX = 0; 
+                    }
+                    else if (player.velocityX < 0 && player.x < p.x + p.w && player.x + player.width > p.x + p.w && player.y + player.height > p.y + 5 && player.y < p.y + p.h - 5) { 
+                        player.x = p.x + p.w; player.velocityX = 0; 
+                    }
+                }
+            }
+        });
+        
+        coins.forEach(c => { 
+            if (!c.collected && player.x < c.x + c.w && player.x + player.width > c.x && player.y < c.y + c.h && player.y + player.height > c.y) { 
+                c.collected = true; coinsCollected++; 
+                if(coinsCollected === totalCoins && goal) goal.active = true; 
+                updateUI(); 
+            }
+        });
+        
+        if (!player.isDead) enemies.forEach(e => { if (player.x < e.x + e.w && player.x + player.width > e.x && player.y < e.y + e.h && player.y + player.height > e.y) playerDie(); });
+        if (player.y > canvas.height! + 50 && !player.isDead) playerDie();
+    }
+
+    // --- EVENTOS DE MORTE E VITÓRIA ---
+    function playerDie() {
+        player.isDead = true; attempts++; stats.totalDeaths++; recordAttemptEnd(false);
+        setPkModal({ show: true, type: 'death', data: { attempts, deaths: stats.totalDeaths } });
+    }
+
+    function completePhase() {
+        recordAttemptEnd(true);
+        globalResilienceData.allAttempts = globalResilienceData.allAttempts.concat(attemptData);
+        globalResilienceData.phaseTimes[currentPhase + 1] = gameTime;
+        
+        if (currentPhase === 4) { // FASE 5 (IMPOSSÍVEL)
+            const gRes = calculateGlobalResilienceIndex();
+            setPkModal({ show: true, type: 'impossible', data: { time: gameTime, att: attempts, res: (gRes.R*100).toFixed(1) } });
+        } else {
+            setPkModal({ show: true, type: 'victory', data: { time: gameTime, att: attempts } });
+        }
+    }
+
+    // Expondo funções pro React usar nos botões
+    pkEngine.current = {
+        restart: () => { setPkModal({show: false, type: ''}); loadPhase(currentPhase); },
+        skip: () => { 
+            stats.skippedPhases++; 
+            if(currentPhase === 4) alert("🚨 REVELAÇÃO: Esta fase era realmente impossível!");
+            if(currentPhase < MAPS.length - 1) loadPhase(currentPhase + 1); 
+        },
+        next: () => {
+            setPkModal({show: false, type: ''});
+            if (currentPhase < MAPS.length - 1) loadPhase(currentPhase + 1);
+            else {
+                // FIM DO JOGO -> SALVAR NO BANCO DE DADOS
+                const finalR = calculateGlobalResilienceIndex();
+                const convertedScore = (finalR.R * 5).toFixed(1); 
+                
+                alert(`🎉 Mapeamento Concluído!\nSeu Índice de Resiliência Global: ${(finalR.R*100).toFixed(1)}%\nA IA salvará a nota ${convertedScore}/5.0 no seu perfil agora.`);
+                
+                salvarPerfilNoBanco({ psico_resiliencia: convertedScore });
+                setHudDisplay(prev => ({ ...prev, scoreResiliencia: convertedScore }));
+                setAbaAtiva("progresso");
+            }
+        }
+    };
+
+    // --- DESENHO NO CANVAS ---
+    function draw() {
+        ctx.fillStyle = '#1a202c'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        platforms.forEach(p => {
+            ctx.fillStyle = p.type === 'death' ? '#e53e3e' : p.type === 'slide' ? '#d69e2e' : p.type === 'wall' ? '#4a5568' : '#48bb78';
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            if(p.type === 'slide') { ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(p.x+5, p.y+5, p.w-10, 3); }
+        });
+        coins.forEach(c => { if(!c.collected) { ctx.fillStyle = '#f6e05e'; ctx.beginPath(); ctx.arc(c.x+c.w/2, c.y+c.h/2, c.w/2, 0, Math.PI*2); ctx.fill(); }});
+        enemies.forEach(e => { ctx.fillStyle = '#e53e3e'; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.fillStyle = '#fff'; ctx.fillRect(e.x+6, e.y+6, 5, 5); ctx.fillRect(e.x+e.w-11, e.y+6, 5, 5); });
+        
+        // Desenha a meta
+        if(goal) { ctx.fillStyle = goal.active ? (Math.sin(Date.now()/200)>0?'#38a169':'#48bb78') : '#718096'; ctx.fillRect(goal.x, goal.y, goal.w, goal.h); }
+        
+        if(!player.isDead) { ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.width, player.height); }
+    }
+
+    function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+
+    // Iniciar
+    const handleKeyDown = (e:any) => { const k=e.key.toLowerCase(); if(['a','arrowleft'].includes(k)) keys['left']=true; if(['d','arrowright'].includes(k)) keys['right']=true; if(['w','arrowup',' '].includes(k)) keys['jump']=true; if(k==='r') pkEngine.current.restart(); e.preventDefault(); };
+    const handleKeyUp = (e:any) => { const k=e.key.toLowerCase(); if(['a','arrowleft'].includes(k)) keys['left']=false; if(['d','arrowright'].includes(k)) keys['right']=false; if(['w','arrowup',' '].includes(k)) keys['jump']=false; };
+    
+    window.addEventListener('keydown', handleKeyDown, {passive: false}); window.addEventListener('keyup', handleKeyUp);
+    loadPhase(0); gameLoop();
+
+    return () => {
+        isGameRunning = false; window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp);
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [abaAtiva]);
+
 
   // ==========================================
   // 🗂️ GESTÃO (ESTUDANTES E ESCOLAS)
@@ -340,28 +642,100 @@ export default function EduGuIA() {
         </section>
       )}
 
-      {/* PARKOUR */}
+{/* PARKOUR V2 (MOTOR AVANÇADO) */}
       {abaAtiva === "parkour" && (
-        <section className="card">
-          <div style={{ textAlign: "center", marginBottom: "10px" }}><h2>🎮 Parkour da Resiliência</h2><p className="mut">Pule de bloco em bloco. Se cair, o jogo acaba!</p></div>
-          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", marginBottom: "12px" }}>
-            <div className="badge">Blocos: <strong style={{ marginLeft: "6px" }}>{hudDisplay.blocos}</strong></div>
-            <div className="badge">Velocidade: <strong style={{ marginLeft: "6px" }}>{hudDisplay.velocidade}x</strong></div>
-            <div className="badge">Score: <strong style={{ marginLeft: "6px" }}>{hudDisplay.scoreResiliencia}</strong></div>
-          </div>
-          <div className="card" style={{ position: "relative", textAlign: "center", padding: "0", overflow: "hidden", boxShadow: "0 0 20px rgba(59, 130, 246, 0.3)" }}>
-            {pkStatus === 'idle' && (<div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 10 }}><h3 style={{ color: "#fff", fontSize: "24px", marginBottom: "10px" }}>Pronto para pular?</h3><button className="btn btn-primary" onClick={iniciarParkour}>▶️ Iniciar Jogo</button></div>)}
-            {pkStatus === 'gameover' && (<div style={{ position: "absolute", inset: 0, background: "rgba(239, 68, 68, 0.2)", backdropFilter: "blur(2px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 10 }}><h2 style={{ color: "#ef4444", fontSize: "32px", fontWeight: "900", marginBottom: "5px", textShadow: "0 0 10px rgba(0,0,0,0.8)" }}>GAME OVER</h2><p style={{ color: "#fff", marginBottom: "15px", fontWeight: "bold" }}>Você superou {hudDisplay.blocos} blocos!</p><button className="btn btn-warn" onClick={iniciarParkour} style={{ padding: "12px 24px", fontSize: "18px" }}>🔄 Tentar Novamente</button></div>)}
-            <canvas ref={canvasRef} width="720" height="350" style={{ background: "#0b1222", borderRadius: "10px", border: "2px solid #1e3a8a", display: "block", margin: "0 auto", maxWidth: "100%" }}/>
-          </div>
-          <div className="row" style={{ justifyContent: "center", flexWrap: "wrap", marginTop: "12px" }}>
-             <button className="btn btn-primary" type="button" onClick={() => pkStatus === 'playing' ? pularParkour() : iniciarParkour()}>{pkStatus === 'playing' ? '🔼 Pular (ESPAÇO)' : '▶️ Iniciar Jogo (ESPAÇO)'}</button>
-             <button className="btn btn-ok" type="button" onClick={() => { 
-                pararParkour(); 
-                salvarPerfilNoBanco({ psico_resiliencia: hudDisplay.scoreResiliencia });
-                alert(`🏁 Score salvo: ${hudDisplay.scoreResiliencia}/5.0`); 
-                setAbaAtiva("progresso"); 
-              }}>🏁 Salvar Score e Sair</button>
+        <section className="card" style={{ padding: "0", background: "#f7fafc", overflow: "hidden" }}>
+          
+          {/* Estilos injetados do seu CSS original para o Parkour não quebrar o layout global */}
+          <style>{`
+            .pk-btn { padding: 10px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-bottom: 8px;}
+            .pk-btn-danger { background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); color: white; }
+            .pk-btn-sec { background: #e2e8f0; color: #4a5568; }
+            .pk-btn-primary { background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white; }
+            .pk-modal { position: absolute; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+            .pk-modal-content { background: white; padding: 25px; border-radius: 12px; text-align: center; width: 90%; max-width: 400px; }
+          `}</style>
+
+          <div style={{ display: "flex", height: "70vh", minHeight: "500px" }}>
+            
+            {/* CANVA DO JOGO (80% da tela) */}
+            <div style={{ flex: "4", background: "#2d3748", position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <canvas ref={canvasRef} width="1000" height="600" style={{ maxWidth: "100%", maxHeight: "100%", borderRight: "4px solid #1a202c" }} />
+              
+              {/* MODAIS DO JOGO */}
+              {pkModal.show && pkModal.type === 'death' && (
+                <div className="pk-modal">
+                  <div className="pk-modal-content">
+                    <h2 style={{color: "#e53e3e", marginBottom: "10px", fontSize: "24px"}}>💀 Você Morreu!</h2>
+                    <p style={{marginBottom: "15px", color: "#718096"}}>Tentativa atual: {pkModal.data.attempts} | Mortes totais: {pkModal.data.deaths}</p>
+                    <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.restart()}>Tentar Novamente</button>
+                  </div>
+                </div>
+              )}
+              {pkModal.show && pkModal.type === 'victory' && (
+                <div className="pk-modal">
+                  <div className="pk-modal-content">
+                    <h2 style={{color: "#38a169", marginBottom: "10px", fontSize: "24px"}}>🏆 Fase Concluída!</h2>
+                    <p style={{marginBottom: "15px", color: "#718096"}}>Tentativas: {pkModal.data.att} | Tempo: {pkModal.data.time}s</p>
+                    <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.next()}>Próxima Fase</button>
+                  </div>
+                </div>
+              )}
+              {pkModal.show && pkModal.type === 'impossible' && (
+                <div className="pk-modal">
+                  <div className="pk-modal-content">
+                    <h2 style={{color: "#d69e2e", marginBottom: "10px", fontSize: "24px"}}>🎯 Análise Concluída</h2>
+                    <p style={{marginBottom: "15px", color: "#718096"}}>Tempo: {pkModal.data.time}s | Tentativas: {pkModal.data.att}</p>
+                    <div style={{ padding: "10px", background: "rgba(229, 62, 62, 0.1)", border: "2px solid #e53e3e", borderRadius: "8px", marginBottom: "15px", color: "#e53e3e", fontWeight: "bold" }}>
+                      REVELAÇÃO: Esta fase era impossível! Sua reação foi analisada.
+                    </div>
+                    <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.next()}>Finalizar e Gerar Perfil</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* PAINEL DE ESTATÍSTICAS LATERAL (20% da tela) */}
+            <div style={{ flex: "1", padding: "15px", overflowY: "auto", background: "linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)", color: "#2d3748" }}>
+              <div style={{ background: "white", padding: "12px", borderRadius: "8px", borderLeft: "4px solid #4299e1", marginBottom: "15px" }}>
+                <div style={{ fontWeight: "bold", fontSize: "14px" }}>PARKOUR EDUGUIA</div>
+                <div style={{ fontSize: "12px", color: "#718096" }}>Avaliação de Resiliência</div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "15px" }}>
+                <div style={{ background: "white", padding: "8px", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                  <div style={{ fontSize: "10px", color: "#718096" }}>Fase Atual</div>
+                  <strong ref={pkRefs.fase} style={{ fontSize: "16px" }}>1 / 5</strong>
+                </div>
+                <div style={{ background: "white", padding: "8px", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                  <div style={{ fontSize: "10px", color: "#718096" }}>Moedas</div>
+                  <strong ref={pkRefs.moedas} style={{ fontSize: "16px" }}>0 / 0</strong>
+                </div>
+                <div style={{ background: "white", padding: "8px", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                  <div style={{ fontSize: "10px", color: "#718096" }}>Tentativas</div>
+                  <strong ref={pkRefs.tentativas} style={{ fontSize: "16px" }}>0</strong>
+                </div>
+                <div style={{ background: "white", padding: "8px", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                  <div style={{ fontSize: "10px", color: "#718096" }}>Tempo</div>
+                  <strong ref={pkRefs.tempo} style={{ fontSize: "16px" }}>0s</strong>
+                </div>
+              </div>
+
+              <div ref={pkRefs.resDisplay} style={{ display: "none", background: "linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%)", padding: "12px", borderRadius: "8px", borderLeft: "4px solid #4a5568", marginBottom: "15px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "bold" }}>Índice de Resiliência</div>
+                <div ref={pkRefs.resValue} style={{ fontSize: "24px", fontWeight: "bold", textAlign: "center", margin: "10px 0", color: "#2b6cb0" }}>0%</div>
+              </div>
+
+              <button className="pk-btn pk-btn-danger" onClick={() => pkEngine.current.skip()}>⏭ Pular Fase (Frustração)</button>
+              <button className="pk-btn pk-btn-sec" onClick={() => pkEngine.current.restart()}>🔄 Reiniciar Fase (R)</button>
+
+              <div style={{ marginTop: "15px", padding: "12px", background: "white", borderRadius: "8px", fontSize: "12px", color: "#718096" }}>
+                <strong>Controles:</strong><br/>
+                W / Espaço / ↑ : Pular<br/>
+                A / D / ← → : Andar
+              </div>
+            </div>
+
           </div>
         </section>
       )}
