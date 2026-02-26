@@ -375,6 +375,7 @@ export default function EduGuIA() {
 
     // --- DESENHO NO CANVAS ---
     function draw() {
+        if (!ctx) return;
         ctx.fillStyle = '#1a202c'; 
         ctx.fillRect(0, 0, canvas?.width || 1000, canvas?.height || 600);
         platforms.forEach(p => {
