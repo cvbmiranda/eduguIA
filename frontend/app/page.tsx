@@ -326,7 +326,7 @@ export default function EduGuIA() {
         });
         
         if (!player.isDead) enemies.forEach(e => { if (player.x < e.x + e.w && player.x + player.width > e.x && player.y < e.y + e.h && player.y + player.height > e.y) playerDie(); });
-        if (player.y > canvas.height! + 50 && !player.isDead) playerDie();
+        if (canvas && player.y > canvas.height + 50 && !player.isDead) playerDie();
     }
 
     // --- EVENTOS DE MORTE E VITÓRIA ---
@@ -375,7 +375,8 @@ export default function EduGuIA() {
 
     // --- DESENHO NO CANVAS ---
     function draw() {
-        ctx.fillStyle = '#1a202c'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#1a202c'; 
+        ctx.fillRect(0, 0, canvas?.width || 1000, canvas?.height || 600);
         platforms.forEach(p => {
             ctx.fillStyle = p.type === 'death' ? '#e53e3e' : p.type === 'slide' ? '#d69e2e' : p.type === 'wall' ? '#4a5568' : '#48bb78';
             ctx.fillRect(p.x, p.y, p.w, p.h);
