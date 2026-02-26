@@ -265,8 +265,8 @@ export default function EduGuIA() {
         if (keys['jump'] && player.isGrounded) { player.velocityY = -player.jumpForce; player.isGrounded = false; keys['jump'] = false; }
         
         player.x += player.velocityX; player.velocityY += 0.5; player.y += player.velocityY;
-        player.x = Math.max(10, Math.min(canvas.width! - player.width - 10, player.x));
-
+        player.x = Math.max(10, Math.min((canvas?.width || 800) - player.width - 10, player.x));
+        
         enemies.forEach(e => {
             if (e.movement === "horizontal") { e.x += e.speed * e.direction; if (e.x > e.startX + e.range || e.x < e.startX - e.range) e.direction *= -1; }
             else { e.y += e.speed * e.direction; if (e.y > e.startY + e.range || e.y < e.startY - e.range) e.direction *= -1; }
