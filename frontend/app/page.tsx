@@ -2,6 +2,9 @@
 import { useState, useEffect, useRef } from "react";
 
 export default function EduGuIA() {
+  // No topo da função EduGuIA
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   // --- ESTADOS GERAIS ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState("home");
@@ -26,11 +29,11 @@ export default function EduGuIA() {
     if (!loggedUserId) return;
     const token = localStorage.getItem("edg_token");
     try {
-      const resGet = await fetch(`http://localhost:8000/profiles/${loggedUserId}`, { headers: { "Authorization": `Bearer ${token}` } });
+      const resGet = await fetch(`${API_URL}/profiles/${loggedUserId}`, { headers: { "Authorization": `Bearer ${token}` } });
       if (resGet.ok) {
         const perfilAtual = await resGet.json();
         const novoPerfil = { ...perfilAtual, ...dadosAtualizados };
-        await fetch(`http://localhost:8000/profiles/${loggedUserId}`, {
+        await fetch(`${API_URL}/profiles/${loggedUserId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
           body: JSON.stringify(novoPerfil)
@@ -427,10 +430,10 @@ export default function EduGuIA() {
   const carregarDadosGestao = async (tipo?: 'estudantes' | 'escolas') => { 
     const token = localStorage.getItem("edg_token"); if (!token) return; 
     try { 
-      const resEstudantes = await fetch("http://localhost:8000/users/", { headers: { "Authorization": `Bearer ${token}` } }); 
+      const resEstudantes = await fetch(`${API_URL}/users/`, { headers: { "Authorization": `Bearer ${token}` } }); 
       if (resEstudantes.ok) { const data = await resEstudantes.json(); setUsuarios(data); } 
       
-      const resEscolas = await fetch("http://localhost:8000/schools/", { headers: { "Authorization": `Bearer ${token}` } });
+      const resEscolas = await fetch(`${API_URL}/schools/`, { headers: { "Authorization": `Bearer ${token}` } });
       if (resEscolas.ok) { const data = await resEscolas.json(); setEscolas(data); }
       
       if (tipo === 'estudantes') { 
@@ -447,13 +450,13 @@ export default function EduGuIA() {
 
   const abrirModalNovoEstudante = () => { setNovoEstudante({ id: null, matricula: "", nome: "", role: "student", turma: "", email: "", senha: "", school_id: "", ativo: "Sim" }); setMsgGestao({ texto: "", erro: false }); setShowStudentModal(true); };
   const abrirModalEditarEstudante = (u: any) => { setNovoEstudante({ id: u.id, matricula: u.matricula || "", nome: u.nome, role: u.role, turma: u.turma || "", email: u.email, senha: "", school_id: u.school_id ? String(u.school_id) : "", ativo: u.is_active ? "Sim" : "Não" }); setMsgGestao({ texto: "", erro: false }); setShowStudentModal(true); };
-  const handleSalvarEstudante = async (e: React.FormEvent) => { e.preventDefault(); setMsgGestao({ texto: "Salvando...", erro: false }); const token = localStorage.getItem("edg_token"); const isEdit = novoEstudante.id !== null; const url = isEdit ? `http://localhost:8000/users/${novoEstudante.id}` : "http://localhost:8000/users/"; try { const res = await fetch(url, { method: isEdit ? "PUT" : "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify(novoEstudante) }); if (res.ok) { setMsgGestao({ texto: "✅ Salvo com sucesso!", erro: false }); carregarDadosGestao(); setTimeout(() => setShowStudentModal(false), 1000); } else { const data = await res.json(); setMsgGestao({ texto: `❌ Erro: ${data.detail}`, erro: true }); } } catch (err) { setMsgGestao({ texto: "❌ Erro de conexão.", erro: true }); } };
-  const handleExcluirUsuario = async (id: number, nome: string) => { if (!confirm(`Apagar ${nome}?`)) return; const t = localStorage.getItem("edg_token"); await fetch(`http://localhost:8000/users/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${t}` } }); carregarDadosGestao(); };
+  const handleSalvarEstudante = async (e: React.FormEvent) => { e.preventDefault(); setMsgGestao({ texto: "Salvando...", erro: false }); const token = localStorage.getItem("edg_token"); const isEdit = novoEstudante.id !== null; const url = isEdit ? `${API_URL}/users/${novoEstudante.id}` : `${API_URL}/users/`; try { const res = await fetch(url, { method: isEdit ? "PUT" : "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify(novoEstudante) }); if (res.ok) { setMsgGestao({ texto: "✅ Salvo com sucesso!", erro: false }); carregarDadosGestao(); setTimeout(() => setShowStudentModal(false), 1000); } else { const data = await res.json(); setMsgGestao({ texto: `❌ Erro: ${data.detail}`, erro: true }); } } catch (err) { setMsgGestao({ texto: "❌ Erro de conexão.", erro: true }); } };
+  const handleExcluirUsuario = async (id: number, nome: string) => { if (!confirm(`Apagar ${nome}?`)) return; const t = localStorage.getItem("edg_token"); await fetch(`${API_URL}/users/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${t}` } }); carregarDadosGestao(); };
 
   const abrirModalNovaEscola = () => { setNovaEscola({ id: null, nome: "", contato: "", ativa: "Sim" }); setMsgGestao({ texto: "", erro: false }); setShowSchoolModal(true); };
   const abrirModalEditarEscola = (e: any) => { setNovaEscola({ id: e.id, nome: e.nome, contato: e.contato || "", ativa: e.ativa }); setMsgGestao({ texto: "", erro: false }); setShowSchoolModal(true); };
-  const handleSalvarEscola = async (e: React.FormEvent) => { e.preventDefault(); const token = localStorage.getItem("edg_token"); const isEdit = novaEscola.id !== null; const url = isEdit ? `http://localhost:8000/schools/${novaEscola.id}` : "http://localhost:8000/schools/"; try { const res = await fetch(url, { method: isEdit ? "PUT" : "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ nome: novaEscola.nome, contato: novaEscola.contato, ativa: novaEscola.ativa }) }); if (res.ok) { alert("✅ Salvo!"); setShowSchoolModal(false); carregarDadosGestao(); } else { alert("❌ Erro"); } } catch (err) { alert("❌ Erro de conexão."); } };
-  const handleExcluirEscola = async (id: number, nome: string) => { if (!confirm(`Apagar escola ${nome}?`)) return; const t = localStorage.getItem("edg_token"); await fetch(`http://localhost:8000/schools/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${t}` } }); carregarDadosGestao(); };
+  const handleSalvarEscola = async (e: React.FormEvent) => { e.preventDefault(); const token = localStorage.getItem("edg_token"); const isEdit = novaEscola.id !== null; const url = isEdit ? `${API_URL}/schools/${novaEscola.id}` : `${API_URL}/schools/`; try { const res = await fetch(url, { method: isEdit ? "PUT" : "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ nome: novaEscola.nome, contato: novaEscola.contato, ativa: novaEscola.ativa }) }); if (res.ok) { alert("✅ Salvo!"); setShowSchoolModal(false); carregarDadosGestao(); } else { alert("❌ Erro"); } } catch (err) { alert("❌ Erro de conexão."); } };
+  const handleExcluirEscola = async (id: number, nome: string) => { if (!confirm(`Apagar escola ${nome}?`)) return; const t = localStorage.getItem("edg_token"); await fetch(`${API_URL}/schools/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${t}` } }); carregarDadosGestao(); };
 
   // ==========================================
   // 📈 RELATÓRIOS (CONECTADO AO BANCO!)
@@ -470,7 +473,7 @@ export default function EduGuIA() {
   const carregarPerfilAluno = async (id: number) => {
     const token = localStorage.getItem("edg_token");
     try {
-      const res = await fetch(`http://localhost:8000/profiles/${id}`, { headers: { "Authorization": `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/profiles/${id}`, { headers: { "Authorization": `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         setPerfilAluno(data);
@@ -498,11 +501,11 @@ export default function EduGuIA() {
     if (!email || !senha) { setErro("Preencha email e senha"); setCarregando(false); return; } 
     try { 
       const fd = new URLSearchParams(); fd.append("username", email); fd.append("password", senha); 
-      const res = await fetch("http://localhost:8000/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: fd.toString() }); 
+      const res = await fetch(`${API_URL}/token`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: fd.toString() }); 
       if (!res.ok) throw new Error("Email ou senha incorretos"); 
       const data = await res.json(); localStorage.setItem("edg_token", data.access_token); setIsLoggedIn(true); 
       
-      const resMe = await fetch("http://localhost:8000/users/me", { headers: { "Authorization": `Bearer ${data.access_token}` } });
+      const resMe = await fetch(`${API_URL}/users/me`, { headers: { "Authorization": `Bearer ${data.access_token}` } });
       if (resMe.ok) { 
         const userData = await resMe.json(); 
         setUserRole(userData.role); 
@@ -515,7 +518,7 @@ export default function EduGuIA() {
         setMensagens([{ role: "assistant", content: `Oi ${userData.nome}! 👋 Vamos conversar?` }]);
 
         // Puxa o progresso do usuário do banco
-        const resProfile = await fetch(`http://localhost:8000/profiles/${userData.id}`, { headers: { "Authorization": `Bearer ${data.access_token}` } });
+        const resProfile = await fetch(`${API_URL}/profiles/${userData.id}`, { headers: { "Authorization": `Bearer ${data.access_token}` } });
         if (resProfile.ok) {
           const userProfile = await resProfile.json();
           if (userProfile.psico_resiliencia !== "Não avaliado") setHudDisplay(prev => ({ ...prev, scoreResiliencia: userProfile.psico_resiliencia }));
@@ -531,7 +534,7 @@ export default function EduGuIA() {
     const novaMensagem = { role: "user", content: inputChat }; setMensagens((prev) => [...prev, novaMensagem]); setInputChat(""); setEnviandoChat(true); 
     try { 
       const token = localStorage.getItem("edg_token"); 
-      const response = await fetch("http://localhost:8000/chat", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ pergunta: novaMensagem.content, historico: mensagens }) }); 
+      const response = await fetch(`${API_URL}/chat`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ pergunta: novaMensagem.content, historico: mensagens }) }); 
       if (response.ok) { const data = await response.json(); setMensagens((prev) => [...prev, { role: "assistant", content: data.resposta }]); } 
       else { setMensagens((prev) => [...prev, { role: "assistant", content: `❌ Erro no servidor.` }]); } 
     } catch (error: any) { setMensagens((prev) => [...prev, { role: "assistant", content: `❌ Erro de conexão.` }]); } finally { setEnviandoChat(false); } 
@@ -543,7 +546,7 @@ export default function EduGuIA() {
     const token = localStorage.getItem("edg_token");
     alert("🧠 A IA está lendo o seu histórico e extraindo o seu perfil...");
     try {
-      const res = await fetch(`http://localhost:8000/chat/extract/${loggedUserId}`, {
+      const res = await fetch(`${API_URL}/chat/extract/${loggedUserId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify(mensagens)
