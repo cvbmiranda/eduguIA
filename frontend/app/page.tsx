@@ -106,7 +106,7 @@ export default function EduGuIA() {
   // 🎮 PARKOUR (MOTOR AVANÇADO V2)
   // ==========================================
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number>(null!);
   
   // Refs para atualizar o HUD sem travar o React (Alta Performance)
   const pkRefs = {
