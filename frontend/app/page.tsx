@@ -361,17 +361,30 @@ export default function EduGuIA() {
         },
         next: () => {
             setPkModal({show: false, type: ''});
-            if (currentPhase < MAPS.length - 1) loadPhase(currentPhase + 1);
-            else {
-                // FIM DO JOGO -> SALVAR NO BANCO DE DADOS
+            if (currentPhase < MAPS.length - 1) {
+                loadPhase(currentPhase + 1);
+            } else {
+                // --- FIM DO JOGO: CÁLCULO E DEBUG (Roteiro Alvaro) ---
                 const finalR = calculateGlobalResilienceIndex();
                 const convertedScore = (finalR.R * 5).toFixed(1); 
                 
-                alert(`🎉 Mapeamento Concluído!\nSeu Índice de Resiliência Global: ${(finalR.R*100).toFixed(1)}%\nA IA salvará a nota ${convertedScore}/5.0 no seu perfil agora.`);
+                // Log para auditoria na reunião (conforme solicitado pelo Alvaro)
+                console.log(`[DEBUG PARKOUR] Dados Finais -> Tentativas: ${globalResilienceData.allAttempts.length}, Mortes Totais: ${stats.totalDeaths}`);
+                console.log(`[DEBUG PARKOUR] Índice de Resiliência: ${finalR.R}, Score Salvo: ${convertedScore}`);
+
+                // alert(`🎉 Mapeamento Concluído!\nSeu Índice de Resiliência Global: ${(finalR.R*100).toFixed(1)}%\nA IA salvará a nota ${convertedScore}/5.0 no seu perfil agora.`);
                 
-                salvarPerfilNoBanco({ psico_resiliencia: convertedScore });
+                // --- SALVAMENTO (O que estava faltando!) ---
+                // parkour_status: "Concluído" faz com que o sistema conte como feito
+                salvarPerfilNoBanco({ 
+                  psico_resiliencia: convertedScore,
+                  parkour_status: "Concluído" 
+                });
+
                 setHudDisplay(prev => ({ ...prev, scoreResiliencia: convertedScore }));
                 setAbaAtiva("progresso");
+
+                console.log("Mapeamento salvo com sucesso.");
             }
         }
     };
@@ -663,44 +676,51 @@ export default function EduGuIA() {
 
           <div style={{ display: "flex", height: "70vh", minHeight: "500px" }}>
             
-            {/* CANVA DO JOGO (80% da tela) */}
-            <div style={{ flex: "4", background: "#2d3748", position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
-              <canvas ref={canvasRef} width="1000" height="600" style={{ maxWidth: "100%", maxHeight: "100%", borderRight: "4px solid #1a202c" }} />
-              
-              {/* MODAIS DO JOGO */}
-              {pkModal.show && pkModal.type === 'death' && (
-                <div className="pk-modal">
-                  <div className="pk-modal-content">
-                    <h2 style={{color: "#e53e3e", marginBottom: "10px", fontSize: "24px"}}>💀 Você Morreu!</h2>
-                    <p style={{marginBottom: "15px", color: "#718096"}}>Tentativa atual: {pkModal.data.attempts} | Mortes totais: {pkModal.data.deaths}</p>
-                    <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.restart()}>Tentar Novamente</button>
-                  </div>
-                </div>
-              )}
-              {pkModal.show && pkModal.type === 'victory' && (
-                <div className="pk-modal">
-                  <div className="pk-modal-content">
-                    <h2 style={{color: "#38a169", marginBottom: "10px", fontSize: "24px"}}>🏆 Fase Concluída!</h2>
-                    <p style={{marginBottom: "15px", color: "#718096"}}>Tentativas: {pkModal.data.att} | Tempo: {pkModal.data.time}s</p>
-                    <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.next()}>Próxima Fase</button>
-                  </div>
-                </div>
-              )}
-              {pkModal.show && pkModal.type === 'impossible' && (
-                <div className="pk-modal">
-                  <div className="pk-modal-content">
-                    <h2 style={{color: "#d69e2e", marginBottom: "10px", fontSize: "24px"}}>🎯 Análise Concluída</h2>
-                    <p style={{marginBottom: "15px", color: "#718096"}}>Tempo: {pkModal.data.time}s | Tentativas: {pkModal.data.att}</p>
-                    <div style={{ padding: "10px", background: "rgba(229, 62, 62, 0.1)", border: "2px solid #e53e3e", borderRadius: "8px", marginBottom: "15px", color: "#e53e3e", fontWeight: "bold" }}>
-                      REVELAÇÃO: Esta fase era impossível! Sua reação foi analisada.
+            {/* CANVA DO JOGO (80% da tela) - NOVO CONTAINER COM SCROLL */}
+            <div style={{ flex: "4", background: "#2d3748", position: "relative", display: "flex", overflowX: "auto", alignItems: "center" }}>
+              <div style={{ minWidth: "1000px", margin: "0 auto", position: "relative" }}>
+                <canvas 
+                  ref={canvasRef} 
+                  width="1000" 
+                  height="600" 
+                  style={{ display: "block", borderRight: "4px solid #1a202c" }} 
+                />
+                
+                {/* MODAIS DO JOGO - AGORA DENTRO DO MESMO ESPAÇO DO CANVAS */}
+                {pkModal.show && pkModal.type === 'death' && (
+                  <div className="pk-modal">
+                    <div className="pk-modal-content">
+                      <h2 style={{color: "#e53e3e", marginBottom: "10px", fontSize: "24px"}}>💀 Você Morreu!</h2>
+                      <p style={{marginBottom: "15px", color: "#718096"}}>Tentativa atual: {pkModal.data.attempts} | Mortes totais: {pkModal.data.deaths}</p>
+                      <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.restart()}>Tentar Novamente</button>
                     </div>
-                    <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.next()}>Finalizar e Gerar Perfil</button>
                   </div>
-                </div>
-              )}
+                )}
+                {pkModal.show && pkModal.type === 'victory' && (
+                  <div className="pk-modal">
+                    <div className="pk-modal-content">
+                      <h2 style={{color: "#38a169", marginBottom: "10px", fontSize: "24px"}}>🏆 Fase Concluída!</h2>
+                      <p style={{marginBottom: "15px", color: "#718096"}}>Tentativas: {pkModal.data.att} | Tempo: {pkModal.data.time}s</p>
+                      <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.next()}>Próxima Fase</button>
+                    </div>
+                  </div>
+                )}
+                {pkModal.show && pkModal.type === 'impossible' && (
+                  <div className="pk-modal">
+                    <div className="pk-modal-content">
+                      <h2 style={{color: "#d69e2e", marginBottom: "10px", fontSize: "24px"}}>🎯 Análise Concluída</h2>
+                      <p style={{marginBottom: "15px", color: "#718096"}}>Tempo: {pkModal.data.time}s | Tentativas: {pkModal.data.att}</p>
+                      <div style={{ padding: "10px", background: "rgba(229, 62, 62, 0.1)", border: "2px solid #e53e3e", borderRadius: "8px", marginBottom: "15px", color: "#e53e3e", fontWeight: "bold" }}>
+                        REVELAÇÃO: Esta fase era impossível! Sua reação foi analisada.
+                      </div>
+                      <button className="pk-btn pk-btn-primary" onClick={() => pkEngine.current.next()}>Finalizar e Gerar Perfil</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* PAINEL DE ESTATÍSTICAS LATERAL (20% da tela) */}
+            {/* PAINEL DE ESTATÍSTICAS LATERAL (Abaixo desta linha continua o seu código original do painel) */}
             <div style={{ flex: "1", padding: "15px", overflowY: "auto", background: "linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)", color: "#2d3748" }}>
               <div style={{ background: "white", padding: "12px", borderRadius: "8px", borderLeft: "4px solid #4299e1", marginBottom: "15px" }}>
                 <div style={{ fontWeight: "bold", fontSize: "14px" }}>PARKOUR EDUGUIA</div>
