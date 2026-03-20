@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 import json
 from openai import OpenAI
 from typing import List
+import csv
+from io import StringIO
+from fastapi.responses import StreamingResponse
+from collections import Counter
 
 # Inicia o motor da OpenAI usando a chave que você colocou no .env
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -55,6 +59,11 @@ def init_db():
             )
             db.add(new_admin)
             db.commit()
+        else:
+            # FORÇA O RESET DO ADMIN SE ELE JÁ EXISTIR NO SUPABASE
+            admin.senha_hash = get_password_hash("123")
+            admin.role = "admin"
+            db.commit()
     finally:
         db.close()
 
@@ -83,44 +92,42 @@ async def read_index():
 # --- Auth: Login e Token ---
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    # Agora o form_data.username carrega a MATRÍCULA digitada na tela
+    user = db.query(models.User).filter(models.User.matricula == form_data.username).first()
     
     if not user or not verify_password(form_data.password, user.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
+            detail="Matrícula ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     access_token_expires = timedelta(minutes=60)
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.matricula}, expires_delta=access_token_expires # Mudamos email para matricula
     )
-    
     return {"access_token": access_token, "token_type": "bearer"}
 
 # --- Users ---
 @app.post("/users/", response_model=schemas.UserResponse)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email)
+    db_user = crud.get_user_by_matricula(db, matricula=user.matricula)
     if db_user:
-        raise HTTPException(status_code=400, detail="Email já cadastrado")
+        raise HTTPException(status_code=400, detail="Matrícula já cadastrada")
     return crud.create_user(db=db, user=user)
 
-@app.get("/users/", response_model=list[schemas.UserResponse])
-def read_all_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return db.query(models.User).offset(skip).limit(limit).all()
-
+# Rota para devolver quem está logado
 @app.get("/users/me", response_model=schemas.UserResponse)
-async def read_users_me(current_user: models.User = Depends(get_current_user)):
+def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
-@app.delete("/users/{user_id}")
-def delete_user_route(user_id: int, db: Session = Depends(get_db)):
-    user = crud.delete_user(db, user_id=user_id)
-    if not user:
+# ROTA PARA A GESTÃO SALVAR AS ALTERAÇÕES DO USUÁRIO (NOVO!)
+@app.put("/users/{user_id}", response_model=schemas.UserResponse)
+def update_user_route(user_id: int, user: schemas.UserUpdate, db: Session = Depends(get_db)):
+    updated_user = crud.update_user(db, user_id=user_id, user_data=user)
+    if not updated_user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    return {"message": "Usuário excluído com sucesso"}
+    return updated_user
 
 
 # --- Escolas ---
@@ -225,3 +232,94 @@ def extract_profile_from_chat(user_id: int, historico: List[schemas.MessageItem]
     except Exception as e:
         print(f"Erro na comunicação com a OpenAI: {str(e)}") # Log do erro
         raise HTTPException(status_code=500, detail=f"Erro na OpenAI: {str(e)}")
+
+
+# ==========================================
+# --- RELATÓRIO ANALÍTICO DE TURMA (IA) ---
+# ==========================================
+@app.get("/reports/turma/{turma_nome}")
+def get_turma_report(turma_nome: str, db: Session = Depends(get_db)):
+    alunos = db.query(models.User).filter(models.User.turma == turma_nome, models.User.role == 'student').all()
+    
+    if not alunos:
+        raise HTTPException(status_code=404, detail="Turma não encontrada")
+        
+    perfis = [a.profile for a in alunos if a.profile]
+    
+    if len(perfis) == 0:
+        raise HTTPException(status_code=400, detail="Os alunos desta turma ainda não geraram perfis com a IA.")
+
+    # Função auxiliar para calcular a percentagem da resposta mais comum
+    def calcular_top(campo, default="Sem dados suficientes"):
+        valores = [getattr(p, campo) for p in perfis if getattr(p, campo) and getattr(p, campo) not in ["Pendente", "Não avaliado", "Não informado"]]
+        if not valores: return default
+        
+        contador = Counter(valores)
+        top = contador.most_common(2) # Pega os 2 mais comuns
+        
+        if len(top) == 1:
+            return f"{int((top[0][1]/len(valores))*100)}% {top[0][0]}"
+        else:
+            return f"{int((top[0][1]/len(valores))*100)}% {top[0][0]} | {int((top[1][1]/len(valores))*100)}% {top[1][0]}"
+
+    # Constrói o JSON com as estatísticas reais agregadas
+    return {
+        "socioeconomico": {
+            "tempoMedio": calcular_top("socio_espaco", "Variado"), 
+            "acessoInternet": calcular_top("socio_acesso", "Dados insuficientes"),
+            "possuiEquip": calcular_top("socio_renda", "Não reportado")
+        },
+        "psicologico": {
+            "vulnerabilidade": calcular_top("ia_evasao", "Risco não calculado"),
+            "confianca": calcular_top("psico_autoestima", "Em avaliação"),
+            "bullying": calcular_top("psico_relacao", "Sem alertas graves"),
+            "atencao": calcular_top("psico_atencao", "Normal")
+        },
+        "pedagogico": {
+            "intelDominantes": calcular_top("peda_inteligencia", "Múltiplas"),
+            "aprendizado": calcular_top("peda_aprendizagem", "Misto"),
+            "metEficazes": calcular_top("ia_met_sugerida", "Geral"),
+            "aptidoes": calcular_top("peda_aptidoes", "Generalista"),
+            "autonomia": calcular_top("peda_autonomia", "Dependente")
+        },
+        "abordagem": {
+            "linguagem": calcular_top("ia_abordagem", "Clara e direta"),
+            "recursos": calcular_top("peda_metodologia", "Tradicional")
+        }
+    }
+
+# ==========================================
+# --- EXPORTAÇÃO DE DADOS  ---
+# ==========================================
+@app.get("/export/students")
+def export_students_csv(db: Session = Depends(get_db)):
+    alunos = db.query(models.User).filter(models.User.role == 'student').all()
+    
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';') # Usa ponto e vírgula para o Excel entender colunas
+    
+    # Cabeçalho da Planilha
+    writer.writerow([
+        "Matrícula", "Nome", "Turma", "Email", "Status",
+        "Resp. Familiar", "Renda Média", "Acesso Internet/PC", "Espaço de Estudo", "Transporte",
+        "Autoestima", "Resiliência (Nota)", "Ansiedade", "Foco/Atenção", 
+        "Estilo Aprendizagem", "Maior Aptidão",
+        "IA - Risco Evasão", "IA - Defasagem", "IA - Engajamento", "IA - Metodologia Sugerida"
+    ])
+    
+    for aluno in alunos:
+        p = aluno.profile if aluno.profile else models.StudentProfile()
+        writer.writerow([
+            aluno.matricula, aluno.nome, aluno.turma, aluno.email, "Ativo" if aluno.is_active else "Inativo",
+            p.socio_responsavel, p.socio_renda, p.socio_acesso, p.socio_espaco, p.socio_transporte,
+            p.psico_autoestima, p.psico_resiliencia, p.psico_ansiedade, p.psico_atencao,
+            p.peda_aprendizagem, p.peda_aptidoes,
+            p.ia_evasao, p.ia_defasagem, p.ia_engajamento, p.ia_met_sugerida
+        ])
+        
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]), 
+        media_type="text/csv", 
+        headers={"Content-Disposition": "attachment; filename=relatorio_geral_alunos.csv"}
+    )

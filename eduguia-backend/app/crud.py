@@ -44,14 +44,13 @@ def delete_school(db: Session, school_id: int):
 # ==========================================
 # --- USUÁRIOS ---
 # ==========================================
-def get_user_by_email(db: Session, email: str):
-    return db.query(models.User).filter(models.User.email == email).first()
+def get_user_by_matricula(db: Session, matricula: str):
+    return db.query(models.User).filter(models.User.matricula == matricula).first()
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.senha)
     is_active = True if user.ativo == "Sim" else False
     
-    # Valida se o ID da escola é um número válido
     try:
         school_id_int = int(user.school_id) if user.school_id and str(user.school_id).strip() != "" else None
     except ValueError:
@@ -70,8 +69,34 @@ def create_user(db: Session, user: schemas.UserCreate):
         return db_user
     except IntegrityError:
         db.rollback()
-        # Se tentar colocar uma escola que não existe, o sistema avisa!
-        raise HTTPException(status_code=400, detail="Verifique se o School ID realmente existe na tabela de Escolas ou se o Email/Matrícula já estão em uso.")
+        raise HTTPException(status_code=400, detail="Matrícula ou Email já estão em uso.")
+
+# FUNÇÃO PARA A GESTÃO SALVAR AS ALTERAÇÕES DO USUÁRIO (NOVO!)
+def update_user(db: Session, user_id: int, user_data: schemas.UserUpdate):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        return None
+    
+    db_user.matricula = user_data.matricula
+    db_user.nome = user_data.nome
+    db_user.email = user_data.email
+    db_user.role = user_data.role
+    db_user.turma = user_data.turma
+    db_user.is_active = True if user_data.ativo == "Sim" else False
+    
+    db_user.school_id = int(user_data.school_id) if user_data.school_id and str(user_data.school_id).strip() != "" else None
+
+    # Só atualiza a senha se o admin tiver digitado uma nova
+    if user_data.senha and user_data.senha.strip() != "":
+        db_user.senha_hash = get_password_hash(user_data.senha)
+        
+    try:
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Esta Matrícula já está em uso por outro aluno.")
 
 def delete_user(db: Session, user_id: int):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()

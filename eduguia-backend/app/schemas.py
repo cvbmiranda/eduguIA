@@ -26,7 +26,7 @@ class TurmaResponse(TurmaBase):
 # --- SCHEMAS: USUÁRIO ---
 # ==========================================
 class UserBase(BaseModel):
-    matricula: Optional[str] = None
+    matricula: str  # Agora é obrigatório!
     nome: str
     email: str
     role: str = "student"
